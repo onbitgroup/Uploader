@@ -43,7 +43,7 @@
   </form>
 
   <script>
-    // Resize + compress image
+    // Resize + compress image before upload
     function compressImage(file, maxWidth = 800, quality = 0.7) {
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -69,34 +69,48 @@
     document.getElementById("uploadForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const files = document.getElementById("images").files;
-      const images = [];
-      for (let file of files) {
-        const compressed = await compressImage(file);
-        images.push(compressed);
+      try {
+        const files = document.getElementById("images").files;
+        const images = [];
+        for (let file of files) {
+          const compressed = await compressImage(file);
+          images.push(compressed);
+        }
+
+        const data = {
+          title: document.getElementById("title").value,
+          price: document.getElementById("price").value,
+          description: document.getElementById("description").value,
+          name: document.getElementById("name").value,
+          phone: document.getElementById("phone").value,
+          images: images,
+          createdAt: new Date().toISOString()
+        };
+
+        console.log("Sending data:", data);
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error("Upload failed:", errText);
+          alert("Upload failed: " + errText);
+          return;
+        }
+
+        const result = await res.json();
+        console.log("Upload success:", result);
+        alert(result.message + "\nView gist: " + result.gistUrl);
+
+      } catch (err) {
+        console.error("Error:", err);
+        alert("Error: " + err.message);
       }
-
-      const data = {
-        title: document.getElementById("title").value,
-        price: document.getElementById("price").value,
-        description: document.getElementById("description").value,
-        name: document.getElementById("name").value,
-        phone: document.getElementById("phone").value,
-        images: images,
-        createdAt: new Date().toISOString()
-      };
-
-      // Send to Vercel API
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-
-      const result = await res.json();
-      alert(result.message);
     });
   </script>
 </body>
 </html>
-
