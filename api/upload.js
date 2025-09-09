@@ -5,8 +5,13 @@ export default async function handler(req, res) {
 
   try {
     const data = req.body;
-    const timestamp = Date.now();
-    const filename = `post-${timestamp}.json`;
+
+    // Generate 6-digit ID
+    const postId = Math.floor(100000 + Math.random() * 900000).toString();
+    const filename = `post-${postId}.json`;
+
+    // Also add ID into the JSON content
+    data.id = postId;
 
     const gistId = process.env.GIST_ID;
     if (!gistId) {
@@ -39,7 +44,11 @@ export default async function handler(req, res) {
       return res.status(response.status).json({ message: "GitHub API error", error: result });
     }
 
-    return res.status(200).json({ message: "Post added successfully!", gistUrl: result.html_url });
+    return res.status(200).json({ 
+      message: "Post added successfully!", 
+      gistUrl: result.html_url, 
+      postId: postId 
+    });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error: error.message });
   }
