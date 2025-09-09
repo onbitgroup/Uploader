@@ -13,6 +13,11 @@
 </head>
 <body>
   <h2>Upload Product</h2>
+  <div class="form-group">
+  <label>Post ID:</label>
+  <input type="text" id="postId" readonly>
+  </div>
+
   <form id="uploadForm">
     <div class="form-group">
       <label>Product Title:</label>
@@ -41,7 +46,7 @@
     </div>
     <button type="submit">Submit</button>
   </form>
-
+<script src="JS/script.js"></script>
   <script>
     // Resize + compress image before upload
     function compressImage(file, maxWidth = 800, quality = 0.7) {
@@ -114,3 +119,4 @@
   </script>
 </body>
 </html>
+
