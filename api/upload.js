@@ -1,90 +1,84 @@
-// api/upload.js
+// Generate 6-digit ID
+function generateId() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
+// Resize + compress image before upload
+function compressImage(file, maxWidth = 800, quality = 0.7) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const scale = maxWidth / img.width;
+        const width = img.width > maxWidth ? maxWidth : img.width;
+        const height = img.width > maxWidth ? img.height * scale : img.height;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality)); // compressed Base64
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Set the ID when page loads
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("postId").value = generateId();
+});
+
+document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
 
   try {
-    const {
-      id,
-      title,
-      price,
-      condition,
-      description,
-      name,
-      phone,
-      whatsapp,
-      other,
-      location,
-      images,
-    } = req.body;
-
-    // ---- Basic validation ----
-    if (!id || !title || !price) {
-      return res.status(400).json({ message: "Missing required fields: id, title, or price" });
-    }
-    if (!images || images.length < 1 || images.length > 4) {
-      return res.status(400).json({ message: "You must upload between 1 and 4 images" });
+    const files = document.getElementById("images").files;
+    const images = [];
+    for (let file of files) {
+      const compressed = await compressImage(file);
+      images.push(compressed);
     }
 
-    const filename = `post-${id}.json`;
-
-    // ---- Env check ----
-    const gistId = process.env.GIST_ID;
-    if (!gistId) {
-      return res.status(500).json({ message: "Missing GIST_ID in environment variables" });
-    }
-    if (!process.env.GITHUB_TOKEN) {
-      return res.status(500).json({ message: "Missing GITHUB_TOKEN in environment variables" });
-    }
-
-    // ---- Build data object ----
     const data = {
-      id,
-      title,
-      price,
-      condition: condition || "UNKNOWN",
-      description: description || "",
-      name: name || "",
-      phone: phone || "",
-      whatsapp: Boolean(whatsapp),
-      other: Boolean(other),
-      location: location || "",
-      images,
-      createdAt: new Date().toISOString(),
+      id: document.getElementById("postId").value,
+      title: document.getElementById("title").value,
+      price: document.getElementById("price").value,
+      description: document.getElementById("description").value,
+      name: document.getElementById("name").value,
+      phone: document.getElementById("phone").value,
+      images: images,
+      createdAt: new Date().toISOString()
     };
 
-    const payload = {
-      files: {
-        [filename]: {
-          content: JSON.stringify(data, null, 2),
-        },
-      },
-    };
+    console.log("Sending data:", data);
 
-    // ---- Save to GitHub Gist ----
-    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `token ${process.env.GITHUB_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({ message: "GitHub API error", error: result });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Upload failed:", errText);
+      alert("Upload failed: " + errText);
+      return;
     }
 
-    return res.status(200).json({
-      message: "Post added successfully!",
-      gistUrl: result.html_url,
-      postId: id,
-    });
-  } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message });
+    const result = await res.json();
+    console.log("Upload success:", result);
+    alert("✅ Post uploaded!\nYour Post ID: " + data.id + "\nView gist: " + result.gistUrl);
+
+    // Generate a new ID for the next submission
+    document.getElementById("postId").value = generateId();
+
+    // Reset form
+    document.getElementById("uploadForm").reset();
+  } catch (err) {
+    console.error("Error:", err);
+    alert("Error: " + err.message);
   }
-}
+});
