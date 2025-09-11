@@ -50,6 +50,11 @@ function saveToLocal() {
     const el = document.getElementById(f);
     if (el) data[f] = el.value;
   });
+  data.brand = document.getElementById("brand").checked;
+  data.model = document.getElementById("model").checked;
+  data.whatsapp = document.getElementById("whatsapp").checked;
+  data.other = document.getElementById("other").checked;
+
   localStorage.setItem("uploaderData", JSON.stringify(data));
   alert("✅ Data saved locally!");
 }
@@ -57,8 +62,84 @@ function saveToLocal() {
 // Format price on blur
 document.getElementById("price").addEventListener("blur", (e) => formatPrice(e.target));
 
-// Submit handler (your original code continues here…)
+// Submit handler (real API call again)
 document.getElementById("uploadForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  alert("Submitting... (you can connect this to your API as before)");
+
+  try {
+    const files = document.getElementById("images").files;
+    const images = [];
+    for (let file of Array.from(files).slice(0, 4)) {
+      images.push(await compressImage(file));
+    }
+
+    const data = {
+      id: document.getElementById("postId").value,
+      title: document.getElementById("title").value,
+      price: document.getElementById("price").value,
+      condition: document.getElementById("condition").value,
+      brand: document.getElementById("brand").checked,
+      model: document.getElementById("model").checked,
+      description: document.getElementById("description").value,
+      name: document.getElementById("name").value,
+      phone: "+94" + document.getElementById("phone").value,
+      whatsapp: document.getElementById("whatsapp").checked,
+      other: document.getElementById("other").checked,
+      location: document.getElementById("location").value,
+      images: images,
+      createdAt: new Date().toISOString()
+    };
+
+    console.log("Sending data:", data);
+
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Upload failed:", errText);
+      alert("Upload failed: " + errText);
+      return;
+    }
+
+    const result = await res.json();
+    console.log("Upload success:", result);
+    alert("✅ Post uploaded!\nYour Post ID: " + data.id + "\nView gist: " + result.gistUrl);
+
+    // Generate a new ID for next submission
+    document.getElementById("postId").value = generateId();
+
+    // Reset form
+    document.getElementById("uploadForm").reset();
+    document.getElementById("preview").innerHTML = "";
+  } catch (err) {
+    console.error("Error:", err);
+    alert("Error: " + err.message);
+  }
 });
+
+// Compress images before upload (same as before)
+function compressImage(file, maxWidth = 800, quality = 0.7) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const scale = maxWidth / img.width;
+        const width = img.width > maxWidth ? maxWidth : img.width;
+        const height = img.width > maxWidth ? img.height * scale : img.height;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
