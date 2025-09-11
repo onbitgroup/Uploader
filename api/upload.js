@@ -1,53 +1,58 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Product Uploader</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .form-group { margin-bottom: 12px; }
-    label { display: block; margin-bottom: 4px; }
-    input, textarea, button { width: 100%; padding: 8px; }
-    .preview img { max-width: 120px; margin-right: 8px; margin-top: 8px; }
-  </style>
-</head>
-<body>
-  <h2>Upload Product</h2>
-  <div class="form-group">
-  <label>Post ID:</label>
-  <input type="text" id="postId" readonly>
-  </div>
+// Format price as Rs. xx,xxx
+document.getElementById("price").addEventListener("input", function(e) {
+  let value = e.target.value.replace(/\D/g, "");
+  if (value) {
+    e.target.value = "Rs. " + Number(value).toLocaleString("en-LK");
+  }
+});
 
-  <form id="uploadForm">
-    <div class="form-group">
-      <label>Product Title:</label>
-      <input type="text" id="title" required>
-    </div>
-    <div class="form-group">
-      <label>Upload Images (3-4):</label>
-      <input type="file" id="images" accept="image/*" multiple required>
-      <div class="preview" id="preview"></div>
-    </div>
-    <div class="form-group">
-      <label>Price:</label>
-      <input type="number" id="price">
-    </div>
-    <div class="form-group">
-      <label>Description:</label>
-      <textarea id="description"></textarea>
-    </div>
-    <div class="form-group">
-      <label>Your Name:</label>
-      <input type="text" id="name">
-    </div>
-    <div class="form-group">
-      <label>Phone:</label>
-      <input type="text" id="phone">
-    </div>
-    <button type="submit">Submit</button>
-  </form>
-<script src="JS/script.js"></script>
-</body>
-</html>
+// Preview selected images (limit 4)
+document.getElementById("images").addEventListener("change", function() {
+  const preview = document.getElementById("preview");
+  preview.innerHTML = "";
+  const files = Array.from(this.files).slice(0,4); // limit 4
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.createElement("img");
+      img.src = e.target.result;
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+});
 
+// Save draft in localStorage
+document.getElementById("saveDraft").addEventListener("click", () => {
+  const formData = {
+    id: document.getElementById("postId").value,
+    title: document.getElementById("title").value,
+    price: document.getElementById("price").value,
+    condition: document.getElementById("condition").value,
+    description: document.getElementById("description").value,
+    name: document.getElementById("name").value,
+    phone: document.getElementById("phone").value,
+    whatsapp: document.getElementById("whatsapp").checked,
+    other: document.getElementById("other").checked,
+    location: document.getElementById("location").value
+  };
+  localStorage.setItem("draftForm", JSON.stringify(formData));
+  alert("✅ Draft saved!");
+});
 
+// Load draft if exists
+window.addEventListener("DOMContentLoaded", () => {
+  const draft = localStorage.getItem("draftForm");
+  if (draft) {
+    const data = JSON.parse(draft);
+    Object.keys(data).forEach(key => {
+      if (document.getElementById(key)) {
+        if (typeof data[key] === "boolean") {
+          document.getElementById(key).checked = data[key];
+        } else {
+          document.getElementById(key).value = data[key];
+        }
+      }
+    });
+  }
+});
