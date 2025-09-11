@@ -1,58 +1,90 @@
-// Format price as Rs. xx,xxx
-document.getElementById("price").addEventListener("input", function(e) {
-  let value = e.target.value.replace(/\D/g, "");
-  if (value) {
-    e.target.value = "Rs. " + Number(value).toLocaleString("en-LK");
-  }
-});
+// api/upload.js
 
-// Preview selected images (limit 4)
-document.getElementById("images").addEventListener("change", function() {
-  const preview = document.getElementById("preview");
-  preview.innerHTML = "";
-  const files = Array.from(this.files).slice(0,4); // limit 4
-  files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = document.createElement("img");
-      img.src = e.target.result;
-      preview.appendChild(img);
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  try {
+    const {
+      id,
+      title,
+      price,
+      condition,
+      description,
+      name,
+      phone,
+      whatsapp,
+      other,
+      location,
+      images,
+    } = req.body;
+
+    // ---- Basic validation ----
+    if (!id || !title || !price) {
+      return res.status(400).json({ message: "Missing required fields: id, title, or price" });
+    }
+    if (!images || images.length < 1 || images.length > 4) {
+      return res.status(400).json({ message: "You must upload between 1 and 4 images" });
+    }
+
+    const filename = `post-${id}.json`;
+
+    // ---- Env check ----
+    const gistId = process.env.GIST_ID;
+    if (!gistId) {
+      return res.status(500).json({ message: "Missing GIST_ID in environment variables" });
+    }
+    if (!process.env.GITHUB_TOKEN) {
+      return res.status(500).json({ message: "Missing GITHUB_TOKEN in environment variables" });
+    }
+
+    // ---- Build data object ----
+    const data = {
+      id,
+      title,
+      price,
+      condition: condition || "UNKNOWN",
+      description: description || "",
+      name: name || "",
+      phone: phone || "",
+      whatsapp: Boolean(whatsapp),
+      other: Boolean(other),
+      location: location || "",
+      images,
+      createdAt: new Date().toISOString(),
     };
-    reader.readAsDataURL(file);
-  });
-});
 
-// Save draft in localStorage
-document.getElementById("saveDraft").addEventListener("click", () => {
-  const formData = {
-    id: document.getElementById("postId").value,
-    title: document.getElementById("title").value,
-    price: document.getElementById("price").value,
-    condition: document.getElementById("condition").value,
-    description: document.getElementById("description").value,
-    name: document.getElementById("name").value,
-    phone: document.getElementById("phone").value,
-    whatsapp: document.getElementById("whatsapp").checked,
-    other: document.getElementById("other").checked,
-    location: document.getElementById("location").value
-  };
-  localStorage.setItem("draftForm", JSON.stringify(formData));
-  alert("✅ Draft saved!");
-});
+    const payload = {
+      files: {
+        [filename]: {
+          content: JSON.stringify(data, null, 2),
+        },
+      },
+    };
 
-// Load draft if exists
-window.addEventListener("DOMContentLoaded", () => {
-  const draft = localStorage.getItem("draftForm");
-  if (draft) {
-    const data = JSON.parse(draft);
-    Object.keys(data).forEach(key => {
-      if (document.getElementById(key)) {
-        if (typeof data[key] === "boolean") {
-          document.getElementById(key).checked = data[key];
-        } else {
-          document.getElementById(key).value = data[key];
-        }
-      }
+    // ---- Save to GitHub Gist ----
+    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `token ${process.env.GITHUB_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({ message: "GitHub API error", error: result });
+    }
+
+    return res.status(200).json({
+      message: "Post added successfully!",
+      gistUrl: result.html_url,
+      postId: id,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
-});
+}
