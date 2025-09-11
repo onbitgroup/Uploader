@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f8f8f8; }
+    h2 { color: #333; }
+    .post { 
+      background: #fff; 
+      border: 1px solid #ccc; 
+      padding: 12px; 
+      margin-bottom: 15px; 
+      border-radius: 8px; 
+    }
+    .post-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    .post-header img { 
+      width: 80px; height: 80px; object-fit: cover; border-radius: 6px; 
+    }
+    .post-info { flex: 1; margin-left: 10px; }
+    .post-info h3 { margin: 0; font-size: 18px; }
+    .post-info p { margin: 5px 0; color: #555; }
+    button { 
+      padding: 6px 12px; 
+      background: #d9534f; 
+      color: white; 
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer; 
+    }
+    button:hover { background: #c9302c; }
+
+    .post-details {
+      display: none; 
+      margin-top: 10px; 
+      border-top: 1px solid #ddd; 
+      padding-top: 10px; 
+      color: #333;
+    }
+    .post-details p { margin: 4px 0; }
+    .images img { width: 100px; height: 100px; margin: 5px; border-radius: 6px; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h2>Admin Dashboard</h2>
+  <div id="posts">Loading posts...</div>
+
+  <script>
+    const gistId = "0209e8416194253a552630900511fb9a"; // 🔑 replace with your gist ID
+
+    async function loadPosts() {
+      try {
+        const res = await fetch(`https://api.github.com/gists/${gistId}`);
+        if (!res.ok) {
+          document.getElementById("posts").innerText = "Failed to load posts.";
+          return;
+        }
+
+        const gist = await res.json();
+        const files = gist.files;
+        let html = "";
+
+        for (let fileName in files) {
+          if (!fileName.startsWith("post-")) continue; 
+
+          const content = JSON.parse(files[fileName].content);
+
+          html += `
+            <div class="post">
+              <div class="post-header" onclick="toggleDetails('${fileName}')">
+                <img src="${(content.images && content.images[0]) || ''}" alt="Post Image">
+                <div class="post-info">
+                  <h3>${content.title || "No Title"}</h3>
+                  <p>${content.price || "N/A"}</p>
+                </div>
+                <button onclick="event.stopPropagation(); removePost('${fileName}')">Remove</button>
+              </div>
+
+              <div class="post-details" id="details-${fileName}">
+                <p><strong>Condition:</strong> ${content.condition || ""}</p>
+                <p><strong>Brand:</strong> ${content.brand ? "Yes" : "No"}</p>
+                <p><strong>Model:</strong> ${content.model ? "Yes" : "No"}</p>
+                <p><strong>Description:</strong> ${content.description || ""}</p>
+                <p><strong>Name:</strong> ${content.name || ""}</p>
+                <p><strong>Phone:</strong> ${content.phone || ""}</p>
+                <p><strong>Whatsapp:</strong> ${content.whatsapp ? "Yes" : "No"}</p>
+                <p><strong>Other:</strong> ${content.other ? "Yes" : "No"}</p>
+                <p><strong>Location:</strong> ${content.location || ""}</p>
+                <div class="images">
+                  ${(content.images || []).map(img => `<img src="${img}" />`).join("")}
+                </div>
+                <p><strong>Uploaded:</strong> ${new Date(content.createdAt).toLocaleString()}</p>
+              </div>
+            </div>
+          `;
+        }
+
+        document.getElementById("posts").innerHTML = html || "No posts yet.";
+      } catch (err) {
+        console.error(err);
+        document.getElementById("posts").innerText = "Error loading posts.";
+      }
+    }
+
+    function toggleDetails(fileName) {
+      const el = document.getElementById(`details-${fileName}`);
+      el.style.display = el.style.display === "block" ? "none" : "block";
+    }
+
+    async function removePost(fileName) {
+      if (!confirm("Are you sure you want to remove this post?")) return;
+      try {
+        const res = await fetch("/api/removePost", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileName })
+        });
+
+        const result = await res.json();
+        if (res.ok) {
+          alert("✅ Post removed!");
+          loadPosts(); // reload list
+        } else {
+          alert("❌ Failed to remove: " + result.message);
+        }
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    }
+
+    loadPosts();
+  </script>
+</body>
+</html>
